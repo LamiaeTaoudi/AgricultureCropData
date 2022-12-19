@@ -1,0 +1,515 @@
+---
+title: "Crop Yield Analysis"
+author: "Lamiae Taoudi"
+date: "2022-09-20"
+output: html_document
+fig_width: 10 
+fig_height: 10 
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## EDA 
+
+Loading soybeans yield data collected from the Delta region of Mississippi. The aggregated yield from different farms is provided with the corresponding soil conditions and nutrients information.  
+
+```{r}
+library(ggplot2)
+library(dplyr)
+
+# Load data
+data  = read.csv("C:/Users/lamiae/Documents/DataAgriculture/dfAllNutr.csv")
+# Information about data 
+dim(data)
+colnames(data)
+head(data)
+summary(data)
+
+# Check Yield's distribution 
+hist(data$Ave_Yld_Vol_Dr, main="Histogram of Yield of Soybeans",xlab="Yield" )
+qqnorm(data$Ave_Yld_Vol_Dr, main="QQ Plot of Yield of Soybeans",xlab="Yield" )
+qqline(data$Ave_Yld_Vol_Dr)
+summary(data$Ave_Yld_Vol_Dr)
+
+
+```
+
+## Preprocessing of the data
+Removing unnecessary columns from the dataset
+```{r}
+# Remove unnecessary cols 
+data = within(data,rm(X))
+data = within(data,rm(Sum_Yld_Vol_Dr))
+data = within(data,rm(SD_Yld_Vol_Dr))
+colnames(data)
+```
+### Missing Values 
+
+Checking for missing values or NA and removing the corresponding rows 
+
+```{r}
+# Chcecking for NA
+which(is.na(data))
+# Removing rows 
+#Data <-na.omit(data)
+#dim(Data) 
+```
+### Outlier detection 
+Next step is checking for outliers and removing them using a z score and keeping only the values between -2.5 and 2.5 using the filter() function
+```{r}
+# Outlier Removal 
+# Standardization 
+Ave_Yld_Z = (data$Ave_Yld_Vol_Dr - mean(data$Ave_Yld_Vol_Dr))/sd(data$Ave_Yld_Vol_Dr)
+
+# remove values between -2.5 and 2.5
+data_NO = filter(data,Ave_Yld_Z > -2.5 & Ave_Yld_Z < 2.5)
+
+# percent of outliers  
+prc_out = (length(data$Ave_CA)-length(data_NO$Ave_CA))*100/length(data$Ave_CA)
+prc_out
+hist(data_NO$Ave_Yld_Vol_Dr, main="Histogram of Yield of Soybeans, No Outliers",xlab="Yield" )
+qqnorm(data_NO$Ave_Yld_Vol_Dr, main="QQ Plot of Yield of Soybeans, No Outliers",xlab="Yield" )
+qqline(data_NO$Ave_Yld_Vol_Dr)
+summary(data_NO$Ave_Yld_Vol_Dr)
+```
+## Correlation 
+
+Looking at the correlation between all variables 
+```{r}
+correlation <- cor(data_NO[,1:16])
+
+library(corrplot)
+corrplot(correlation,method="circle")
+```
+Looking at the correlation between attributes
+```{r}
+corr <- cor(data_NO[,2:16])
+
+corrplot(corr,method="circle")
+```
+Some variables are highly correlated and removing them might show better regression results 
+## Data Visualization 
+
+Looking at the distributions of the features
+
+```{r}
+# Histograms of each attribute
+par(mfrow=c(3,5))
+for(i in 1:15){
+  hist(data_NO[,i], main = names(data_NO)[i])
+}
+
+```
+Most of the attributes are skewed
+```{r}
+library(e1071)
+skew <- apply(data_NO[,2:16], 2, skewness)
+print(skew)
+```
+The large positive skew value means the distribution is skewed to the right, negative value is skewed to the left. 
+
+scatter plot of all dataset
+```{r }
+pairs(data_NO)
+```
+
+
+
+```{r}
+
+library(cowplot)
+
+ggplot(data_NO, aes(x=Ave_B, y=Ave_Yld_Vol_Dr)) + geom_point() + theme_bw(base_size=25)+
+    scale_x_continuous(breaks = scales::pretty_breaks(n = 3))+
+    scale_y_continuous(breaks = scales::pretty_breaks(n = 3))+
+    xlab("B") + ylab("Yield ") + geom_smooth(method=lm)
+ggsave(paste("C:/Users/lamiae/Documents/DataAgriculture/RCODES/ScatterPlots/B.jpg"))
+
+ggplot(data_NO, aes(x=Ave_CA, y=Ave_Yld_Vol_Dr)) + geom_point() + theme_bw(base_size=25)+
+    scale_x_continuous(breaks = scales::pretty_breaks(n = 3))+
+    scale_y_continuous(breaks = scales::pretty_breaks(n = 3))+
+    xlab("Ca") + ylab("Yield ") + geom_smooth(method=lm)
+ggsave(paste("C:/Users/lamiae/Documents/DataAgriculture/RCODES/ScatterPlots/Ca.jpg"))
+
+ggplot(data_NO, aes(x=Ave_CEC, y=Ave_Yld_Vol_Dr)) + geom_point() + theme_bw(base_size=25)+
+    scale_x_continuous(breaks = scales::pretty_breaks(n = 3))+
+    scale_y_continuous(breaks = scales::pretty_breaks(n = 3))+
+    xlab("Cec") + ylab("Yield ") + geom_smooth(method=lm)
+ggsave(paste("C:/Users/lamiae/Documents/DataAgriculture/RCODES/ScatterPlots/Cec.jpg"))
+
+ggplot(data_NO, aes(x=Ave_CU, y=Ave_Yld_Vol_Dr)) + geom_point() + theme_bw(base_size=25)+
+    scale_x_continuous(breaks = scales::pretty_breaks(n = 3))+
+    scale_y_continuous(breaks = scales::pretty_breaks(n = 3))+
+    xlab("Cu") + ylab("Yield ") + geom_smooth(method=lm)
+ggsave(paste("C:/Users/lamiae/Documents/DataAgriculture/RCODES/ScatterPlots/CU.jpg"))
+
+ggplot(data_NO, aes(x=Ave_K, y=Ave_Yld_Vol_Dr)) + geom_point() + theme_bw(base_size=25)+
+    scale_x_continuous(breaks = scales::pretty_breaks(n = 3))+
+    scale_y_continuous(breaks = scales::pretty_breaks(n = 3))+
+    xlab("K") + ylab("Yield ") + geom_smooth(method=lm)
+ggsave(paste("C:/Users/lamiae/Documents/DataAgriculture/RCODES/ScatterPlots/K.jpg"))
+
+ggplot(data_NO, aes(x=Ave_MG, y=Ave_Yld_Vol_Dr)) + geom_point() + theme_bw(base_size=25)+
+    scale_x_continuous(breaks = scales::pretty_breaks(n = 3))+
+    scale_y_continuous(breaks = scales::pretty_breaks(n = 3))+
+    xlab("Mg") + ylab("Yield ") + geom_smooth(method=lm)
+ggsave(paste("C:/Users/lamiae/Documents/DataAgriculture/RCODES/ScatterPlots/Mg.jpg"))
+
+ggplot(data_NO, aes(x=Ave_MN, y=Ave_Yld_Vol_Dr)) + geom_point() + theme_bw(base_size=25)+
+    scale_x_continuous(breaks = scales::pretty_breaks(n = 3))+
+    scale_y_continuous(breaks = scales::pretty_breaks(n = 3))+
+    xlab("Mn") + ylab("Yield ") + geom_smooth(method=lm)
+ggsave(paste("C:/Users/lamiae/Documents/DataAgriculture/RCODES/ScatterPlots/Mn.jpg"))
+
+ggplot(data_NO, aes(x=Ave_NA, y=Ave_Yld_Vol_Dr)) + geom_point() + theme_bw(base_size=25)+
+    scale_x_continuous(breaks = scales::pretty_breaks(n = 3))+
+    scale_y_continuous(breaks = scales::pretty_breaks(n = 3))+
+    xlab("Na") + ylab("Yield ") + geom_smooth(method=lm)
+ggsave(paste("C:/Users/lamiae/Documents/DataAgriculture/RCODES/ScatterPlots/Na.jpg"))
+
+ggplot(data_NO, aes(x=Ave_OM, y=Ave_Yld_Vol_Dr)) + geom_point() + theme_bw(base_size=25)+
+    scale_x_continuous(breaks = scales::pretty_breaks(n = 3))+
+    scale_y_continuous(breaks = scales::pretty_breaks(n = 3))+
+    xlab("Om") + ylab("Yield ") + geom_smooth(method=lm)
+ggsave(paste("C:/Users/lamiae/Documents/DataAgriculture/RCODES/ScatterPlots/Om.jpg"))
+
+ggplot(data_NO, aes(x=Ave_P, y=Ave_Yld_Vol_Dr)) + geom_point() + theme_bw(base_size=25)+
+    scale_x_continuous(breaks = scales::pretty_breaks(n = 3))+
+    scale_y_continuous(breaks = scales::pretty_breaks(n = 3))+
+    xlab("P") + ylab("Yield ") + geom_smooth(method=lm)
+ggsave(paste("C:/Users/lamiae/Documents/DataAgriculture/RCODES/ScatterPlots/P.jpg"))
+
+ggplot(data_NO, aes(x=Ave_PH, y=Ave_Yld_Vol_Dr)) + geom_point() + theme_bw(base_size=25)+
+    scale_x_continuous(breaks = scales::pretty_breaks(n = 3))+
+    scale_y_continuous(breaks = scales::pretty_breaks(n = 3))+
+    xlab("Ph") + ylab("Yield ") + geom_smooth(method=lm)
+ggsave(paste("C:/Users/lamiae/Documents/DataAgriculture/RCODES/ScatterPlots/Ph.jpg"))
+
+ggplot(data_NO, aes(x=Ave_ZN, y=Ave_Yld_Vol_Dr)) + geom_point() + theme_bw(base_size=25)+
+    scale_x_continuous(breaks = scales::pretty_breaks(n = 3))+
+    scale_y_continuous(breaks = scales::pretty_breaks(n = 3))+
+    xlab("Zn") + ylab("Yield ") + geom_smooth(method=lm)
+ggsave(paste("C:/Users/lamiae/Documents/DataAgriculture/RCODES/ScatterPlots/Zn.jpg"))
+
+ggplot(data_NO, aes(x=Ave_FE, y=Ave_Yld_Vol_Dr)) + geom_point() + theme_bw(base_size=25)+
+    scale_x_continuous(breaks = scales::pretty_breaks(n = 3))+
+    scale_y_continuous(breaks = scales::pretty_breaks(n = 3))+
+    xlab("Fe") + ylab("Yield ") + geom_smooth(method=lm)
+ggsave(paste("C:/Users/lamiae/Documents/DataAgriculture/RCODES/ScatterPlots/Fe.jpg"))
+
+ggplot(data_NO, aes(x=Ave_S, y=Ave_Yld_Vol_Dr)) + geom_point() + theme_bw(base_size=25)+
+    scale_x_continuous(breaks = scales::pretty_breaks(n = 3))+
+    scale_y_continuous(breaks = scales::pretty_breaks(n = 3))+
+    xlab("S") + ylab("Yield ") + geom_smooth(method=lm)
+ggsave(paste("C:/Users/lamiae/Documents/DataAgriculture/RCODES/ScatterPlots/S.jpg"))
+
+ggplot(data_NO, aes(x=Ave_HMEQ, y=Ave_Yld_Vol_Dr)) + geom_point() + theme_bw(base_size=25)+
+    scale_x_continuous(breaks = scales::pretty_breaks(n = 3))+
+    scale_y_continuous(breaks = scales::pretty_breaks(n = 3))+
+    xlab("Hmeq") + ylab("Yield ") + geom_smooth(method=lm)
+ggsave(paste("C:/Users/lamiae/Documents/DataAgriculture/RCODES/ScatterPlots/Hmeq.jpg"))
+
+```
+
+
+
+
+```{r}
+plotHistFunc <- function(x, na.rm = TRUE, ...) {
+  nm <- names(x)
+  for (i in 2:16) {
+    print(ggplot(x, aes(x=x[i], y=x[1])) + geom_point() + ylab("Yield"))
+   # print(ggplot(x,aes_string(x = nm[i])) + geom_histogram(alpha = .5,fill = "mediumseagreen")) 
+#plots <-ggplot(x,aes_string(x = nm[i])) + geom_histogram(alpha = .5,fill = "dodgerblue")
+#ggsave(plots,filename=paste("myplot",nm[i],".png",sep=""))
+  }
+}
+plotHistFunc(data_NO)
+```
+
+
+```{r}
+ca<-ggplot(data_NO, aes(x=Ave_CA, y=Ave_Yld_Vol_Dr)) + geom_point()+ theme_bw(base_size=5)+
+    xlab("Ca") + ylab("Yield ") + geom_smooth(method=lm)
+cec<-ggplot(data_NO, aes(x=Ave_CEC, y=Ave_Yld_Vol_Dr)) + geom_point()+ theme_bw(base_size=5)+
+    xlab("Cec") + ylab("Yield ") + geom_smooth(method=lm)
+cu<-ggplot(data_NO, aes(x=Ave_CU, y=Ave_Yld_Vol_Dr)) + geom_point()+ theme_bw(base_size=5)+
+    xlab("Cu") + ylab("Yield ") + geom_smooth(method=lm)
+k<- ggplot(data_NO, aes(x=Ave_K, y=Ave_Yld_Vol_Dr)) + geom_point()+ theme_bw(base_size=5)+
+    xlab("K") + ylab("Yield ") + geom_smooth(method=lm)
+# 1st row
+row1<- plot_grid( ca, cec, cu, k, ncol = 4)
+
+plot_grid(row1, nrow= 1)
+```
+
+
+```{r}
+```
+
+
+## Validation Dataset
+A validation dataset is used at the end of the analysis to confirm the accuracy of the final model
+
+```{r}
+
+library(caret)
+# splitting out dataset
+set.seed(0)
+val_index <- createDataPartition(data_NO$Ave_Yld_Vol_Dr, p = 0.8, list = FALSE)
+# selecting 20% of the data for validation 
+validation <- data_NO[-val_index,]
+#remaining 80% for training and testing
+train.data <- data_NO[val_index,]
+```
+
+## Generalized linear model
+
+```{r}
+# GLMNET 
+library(glmnet)
+fit.glmnet <- train(Ave_Yld_Vol_Dr~., data= train.data, method = "glmnet", trControl = trainControl("cv", number = 10), preProcess = c("center", "scale"))
+plot(fit.glmnet)
+fit.glmnet$results
+fit.glmnet$resample
+fit.glmnet$bestTune
+#summary(fit.glmnet$finalModel)
+# Make predictions based on test data
+pred.glmnet <- fit.glmnet %>% predict(validation)
+# Model performance metrics
+data.frame(
+  RMSE = caret::RMSE(pred.glmnet, validation$Ave_Yld_Vol_Dr),
+  Rsquare = caret::R2(pred.glmnet, validation$Ave_Yld_Vol_Dr)
+)
+```
+
+## Rnadom Forest
+```{r}
+# Random Forest
+fit.rf <- train(Ave_Yld_Vol_Dr~., data= train.data, method = "rf", trControl = trainControl("cv", number = 10), preProcess = c("center", "scale"))
+plot(fit.rf)
+fit.rf$results
+fit.rf$resample
+fit.rf$bestTune
+
+# Make predictions based on test data
+pred.rf <- fit.rf %>% predict(validation)
+# Model performance metrics
+data.frame(
+  RMSE = caret::RMSE(pred.rf, validation$Ave_Yld_Vol_Dr),
+  Rsquare = caret::R2(pred.rf, validation$Ave_Yld_Vol_Dr)
+)
+
+# variable importance 
+varImp(fit.rf)
+```
+
+
+## Support Vector Machines
+```{r}
+# SVM
+fit.svm <- train(Ave_Yld_Vol_Dr~., data= train.data, method = "svmRadial", trControl = trainControl("cv", number = 10), preProcess = c("center", "scale"))
+plot(fit.svm)
+fit.svm$results
+fit.svm$resample
+fit.svm$bestTune
+
+# Make predictions based on test data
+pred.svm <- fit.svm %>% predict(validation)
+# Model performance metrics
+data.frame(
+  RMSE = caret::RMSE(pred.svm, validation$Ave_Yld_Vol_Dr),
+  Rsquare = caret::R2(pred.svm, validation$Ave_Yld_Vol_Dr)
+)
+```
+
+
+## Principal component regression
+
+PCR is used when there is correlation between the attributes.
+
+```{r}
+# Principal Components Regression
+pcr_model  <- train(
+  Ave_Yld_Vol_Dr~., data = train.data, method = "pcr",
+  scale = TRUE,
+  trControl = trainControl("cv", number = 10),
+  tuneLength = 10
+  )
+# Plot model RMSE vs different values of components
+plot(pcr_model)
+# Print the best tuning parameter ncomp that
+# minimize the cross-validation error, RMSE
+pcr_model$bestTune
+
+# Summarize the final model
+summary(pcr_model$finalModel)
+
+# Make predictions based on test data
+pred.pcr <- pcr_model %>% predict(validation)
+# Model performance metrics
+data.frame(
+  RMSE = caret::RMSE(pred.pcr, validation$Ave_Yld_Vol_Dr),
+  Rsquare = caret::R2(pred.pcr, validation$Ave_Yld_Vol_Dr)
+)
+
+```
+
+## Partial least squares regression
+PLS is used when there is correlation between the attributes and the response
+```{r}
+# Partial Least Squares
+pls_model  <- train(
+  Ave_Yld_Vol_Dr~., data = train.data, method = "pls",
+  scale = TRUE,
+  trControl = trainControl("cv", number = 10),
+  tuneLength = 10
+  )
+# Plot model RMSE vs different values of components
+plot(pls_model)
+# Print the best tuning parameter ncomp that
+# minimize the cross-validation error, RMSE
+pls_model$bestTune
+
+# Summarize the final model
+summary(pls_model$finalModel)
+
+# Make predictions based on test data
+predictions <- pls_model %>% predict(validation)
+# Model performance metrics
+data.frame(
+  RMSE = caret::RMSE(predictions, validation$Ave_Yld_Vol_Dr),
+  Rsquare = caret::R2(predictions, validation$Ave_Yld_Vol_Dr)
+)
+
+```
+
+
+## Subset Selection 
+### Full model
+```{r}
+lm.full <- lm(formula = Ave_Yld_Vol_Dr~. , data = train.data)
+summary(lm.full)
+```
+### Model with only significant effects 
+```{r}
+lm.sigonly <- lm(formula = Ave_Yld_Vol_Dr~ Ave_CA +Ave_CEC + Ave_K + Ave_MG + Ave_NA + Ave_OM + Ave_ZN + Ave_FE , data = train.data)
+summary(lm.sigonly)
+```
+### Null model
+```{r}
+lm.null<-lm(formula=Ave_Yld_Vol_Dr~1 , data = train.data)
+summary(lm.null)
+```
+### Stepwise selection 
+```{r}
+lm.model <- step(lm.null, direction = "both", trace =1, 
+                  scope= ~ Ave_B + Ave_CA + Ave_CEC + Ave_CU + Ave_HMEQ + Ave_FE + Ave_K + Ave_MG + 
+                      Ave_MN + Ave_NA + Ave_OM + Ave_P + Ave_PH + Ave_S + Ave_ZN)
+summary(lm.model)
+```
+
+### Model for interaction of Mg and K 
+```{r}
+# MODEL FOR INTERACTION BETWEEN Mg and K 
+mgk.model = lm(Ave_Yld_Vol_Dr ~ Ave_B  + Ave_CA + Ave_CEC + Ave_CU + Ave_HMEQ + Ave_FE + Ave_K*Ave_MG + Ave_MN + 
+                 Ave_NA + Ave_OM + Ave_P + Ave_PH + Ave_S + Ave_ZN, train.data)
+summary(mgk.model)
+# Interaction MG*K significance test
+anova(lm.full, mgk.model) # small Pval reject H0 so SIG interaction 1
+```
+
+
+```{r}
+# MODEL FOR INTERACTION BETWEEN Mg and K  using the best model of subset selection 
+mgk.model = lm(Ave_Yld_Vol_Dr ~ Ave_CA + Ave_HMEQ + Ave_FE + Ave_K*Ave_MG + + Ave_OM + Ave_ZN, train.data)
+summary(mgk.model)
+# Interaction MG*K significance test
+anova(lm.full, mgk.model) # small Pval reject H0 so SIG interaction 1
+```
+
+### Model for interaction of Mg and CA 
+```{r}
+# MODEL FOR INTERACTION BETWEEN Mg  and CA
+mgca.model = lm(Ave_Yld_Vol_Dr ~ Ave_B  + Ave_CEC + Ave_CU + Ave_HMEQ + Ave_FE + Ave_K + Ave_CA*Ave_MG + Ave_MN + 
+                 Ave_NA + Ave_OM + Ave_P + Ave_PH + Ave_S + Ave_ZN, train.data)
+summary(mgca.model)
+# Interaction MG*CA significance test
+anova(lm.full, mgca.model) # small Pval reject H0 so SIG interaction 1
+```
+
+### Model for interaction of Mg, K and CA 
+```{r}
+# MODEL FOR INTERACTION BETWEEN Mg and K and CA
+mgkca.model = lm(Ave_Yld_Vol_Dr ~ Ave_B  + Ave_CEC + Ave_CU + Ave_HMEQ + Ave_FE + Ave_CA*Ave_K*Ave_MG + Ave_MN + 
+                 Ave_NA + Ave_OM + Ave_P + Ave_PH + Ave_S + Ave_ZN, train.data)
+summary(mgkca.model)
+# Interaction MG*K*CA significance test
+anova(lm.full, mgkca.model) # small Pval reject H0 so SIG interaction 1
+```
+
+```{r}
+# Center y, X will be standardized in the modelling function
+#y <- train.data %>% select(Ave_Yld_Vol_Dr) %>% scale(center = TRUE, scale = FALSE) %>% as.matrix()
+#X <- train.data %>% select(- Ave_Yld_Vol_Dr) %>% as.matrix()
+y <- as.matrix(scale(train.data$Ave_Yld_Vol_Dr , center = TRUE, scale = FALSE))
+X <- as.matrix(train.data[,-1])
+```
+
+## Elastic Net 
+```{r}
+
+library(glmnet)
+library(psych)   # for function tr() to compute trace of a matrix
+
+# Perform 10-fold cross-validation to select lambda ---------------------------
+lambdas_to_try <- 10^seq(-3, 5, length.out = 100)
+# Setting alpha = 1 implements lasso regression
+alpha_to_try<- seq(-0.1, 0.9, length.out = 10)
+ElasticNet_cv <- cv.glmnet(X, y, alpha = 0.5, lambda = lambdas_to_try,
+                      standardize = TRUE, nfolds = 10)
+# Plot cross-validation results
+par(c(1,2))
+plot(ElasticNet_cv)
+plot(log10(ElasticNet_cv$lambda),ElasticNet_cv$cvm)
+ElasticNet_cv$lambda
+```
+```{r}
+# Best cross-validated lambda
+lambda_cv <- ElasticNet_cv$lambda.min
+lambda_cv
+# Fit final model, get its sum of squared residuals and multiple R-squared
+Model_cv <- glmnet(X, y, alpha = 0.5, lambda = lambda_cv, standardize = TRUE)
+y_hat_cv <- predict(Model_cv, X)
+ssr_cv <- t(y - y_hat_cv) %*% (y - y_hat_cv)
+rsq_ElasticNet_cv <- cor(y, y_hat_cv)^2
+rsq_ElasticNet_cv
+
+# See how increasing lambda shrinks the coefficients --------------------------
+# Each line shows coefficients for one variables, for different lambdas.
+# The higher the lambda, the more the coefficients are shrinked towards zero.
+res <- glmnet(X, y, alpha = 0.5, lambda = lambdas_to_try, standardize = FALSE)
+plot(res, xvar = "lambda")
+legend("bottomright",  col = 1:6, legend = colnames(X), cex = .7)
+
+```
+
+### LASSO 
+```{r}
+
+library(glmnet)
+#10-fold cross-validation
+fit_lasso_cv = cv.glmnet(x=X,y=y,alpha=1,lambda=lambdas_to_try,standardize = TRUE, nfold=10)
+plot(fit_lasso_cv)
+
+## choose the optimal lambda and fit the final model
+lambda_cv = fit_lasso_cv$lambda.min
+final_lasso_cv = glmnet(x=X,y=y,alpha=1,lambda=lambda_cv,standardize = TRUE)
+lasso_y_hat_cv <- predict(final_lasso_cv, X)
+lasso_ssr_cv <- t(y - lasso_y_hat_cv) %*% (y - lasso_y_hat_cv)
+rsq_lasso_cv <- cor(y, lasso_y_hat_cv)^2
+rsq_lasso_cv
+```
+
